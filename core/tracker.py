@@ -1,99 +1,131 @@
 """
-Case Tracker — JSON database, case creation, reminders, display.
+Case Tracker — MySQL-backed case creation, reminders, display.
 """
 
 import os
-import json
 import datetime
 
 from utils.ui import C, header
+from database.db import get_connection
 
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Legal-Bot", "outputs")
-# Fallback: use the directory of this file's parent
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_THIS_DIR)
 OUTPUT_DIR = os.path.join(_PROJECT_DIR, "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-DB_PATH = os.path.join(OUTPUT_DIR, "case_database.json")
 
+# ─── Case CRUD ────────────────────────────────────────────────────────────────
 
-def load_db() -> dict:
-    if os.path.exists(DB_PATH):
-        with open(DB_PATH) as f:
-            return json.load(f)
-    return {"cases": []}
-
-
-def save_db(db: dict):
-    with open(DB_PATH, "w") as f:
-        json.dump(db, f, indent=2)
+def _next_case_id() -> str:
+    """Generate a sequential case ID like SC-1001, SC-1002, ..."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM cases")
+        count = cur.fetchone()[0]
+        cur.close()
+        return f"SC-{1000 + count + 1}"
+    finally:
+        conn.close()
 
 
 def create_case(case_data: dict, workflow: dict, court: str,
                 deadline_date: str, deadline_label: str,
                 hearing_date: str) -> str:
-    """Create a new case entry with user-provided court dates."""
-    db = load_db()
-    case_id = f"SC-{1000 + len(db['cases']) + 1}"
+    """Create a new case entry in the MySQL cases table."""
+    case_id = _next_case_id()
     filing_date = datetime.date.today()
+    phone = case_data.get("phone", "N/A")
+    category = workflow.get("title", "General")
+    pdf_path = case_data.get("pdf_path", "")
 
-    entry = {
-        "case_id":       case_id,
-        "phone":         case_data.get("phone", "N/A"),
-        "user_name":     case_data.get("user_name", "Unknown"),
-        "case_type":     workflow["title"],
-        "court":         court,
-        "filing_date":   str(filing_date),
-        "next_deadline": deadline_date,
-        "deadline_label": deadline_label,
-        "hearing_date":  hearing_date,
-        "status":        "Filed",
-        "case_data":     case_data,
-    }
-    db["cases"].append(entry)
-    save_db(db)
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO cases (case_id, phone_number, category, court,
+                               filing_date, hearing_date, pdf_path, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'Filed')
+            """,
+            (case_id, phone, category, court,
+             filing_date, hearing_date or None, pdf_path, ),
+        )
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
     return case_id
 
 
-def _parse_date(date_str: str) -> datetime.date:
-    """Parse a date string in ISO (YYYY-MM-DD) or DD MMM YYYY format."""
-    try:
-        return datetime.date.fromisoformat(date_str)
-    except ValueError:
-        # Try DD MMM YYYY (e.g. "20 Jun 2026")
-        return datetime.datetime.strptime(date_str, "%d %b %Y").date()
-
-
 def check_reminders():
-    db = load_db()
-    today = datetime.date.today()
-    reminders = []
-    for case in db["cases"]:
-        try:
-            deadline = _parse_date(case["next_deadline"])
-            days_left = (deadline - today).days
-            if days_left <= 7:
-                reminders.append((case, days_left))
-        except (ValueError, KeyError):
-            pass  # Skip entries with unparseable dates
-    return reminders
+    """Return list of (case_dict, days_left) for cases with deadline ≤ 7 days away."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT case_id, phone_number, category, court,
+                   filing_date, hearing_date, pdf_path, status
+            FROM cases
+            WHERE hearing_date IS NOT NULL
+              AND DATEDIFF(hearing_date, CURDATE()) <= 7
+              AND hearing_date >= CURDATE()
+            """
+        )
+        rows = cur.fetchall()
+        cur.close()
+
+        reminders = []
+        today = datetime.date.today()
+        for row in rows:
+            case = {
+                "case_id": row[0],
+                "phone": row[1],
+                "category": row[2],
+                "court": row[3],
+                "filing_date": str(row[4]),
+                "hearing_date": str(row[5]),
+                "pdf_path": row[6],
+                "status": row[7],
+                "deadline_label": "Hearing",
+            }
+            days_left = (row[5] - today).days
+            reminders.append((case, days_left))
+        return reminders
+    finally:
+        conn.close()
 
 
 def display_case_tracker(case_id: str):
-    db = load_db()
-    for case in db["cases"]:
-        if case["case_id"] == case_id:
+    """Display case information from the database."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT case_id, phone_number, category, court,
+                   filing_date, hearing_date, pdf_path, status
+            FROM cases WHERE case_id = %s
+            """,
+            (case_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+
+        if row:
             header(f"📋 CASE TRACKER — {case_id}")
-            print(f"  {'Case ID':<22}: {C.BOLD}{case['case_id']}{C.RESET}")
-            print(f"  {'Case Type':<22}: {case['case_type']}")
-            print(f"  {'Court':<22}: {case['court']}")
-            print(f"  {'Status':<22}: {C.GREEN}{case['status']}{C.RESET}")
-            print(f"  {'Filing Date':<22}: {case['filing_date']}")
-            print(f"  {'Next Deadline':<22}: {C.YELLOW}{case['next_deadline']}{C.RESET}  ({case['deadline_label']})")
-            print(f"  {'Hearing Date':<22}: {case['hearing_date']}")
+            print(f"  {'Case ID':<22}: {C.BOLD}{row[0]}{C.RESET}")
+            print(f"  {'Case Type':<22}: {row[2]}")
+            print(f"  {'Court':<22}: {row[3]}")
+            print(f"  {'Status':<22}: {C.GREEN}{row[7]}{C.RESET}")
+            print(f"  {'Filing Date':<22}: {row[4]}")
+            print(f"  {'Hearing Date':<22}: {C.YELLOW}{row[5]}{C.RESET}")
             print()
-            return
-    print(f"  {C.RED}Case {case_id} not found.{C.RESET}")
+        else:
+            print(f"  {C.RED}Case {case_id} not found.{C.RESET}")
+    finally:
+        conn.close()
