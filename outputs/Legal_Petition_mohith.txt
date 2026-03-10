@@ -7,8 +7,8 @@ Plaintiff:
 mohith
 
 Defendant:
-kudumu
-Address: kudmu grounds
+manish
+Address: mpl
 
 Subject:
 General Civil Dispute
@@ -37,7 +37,7 @@ DOCUMENTS ENCLOSED
 3. ID Proof
 4. Any relevant agreements or correspondence
 
-Date: 09 March 2026
+Date: 10 March 2026
 
 _______________________________
 Signature of Plaintiff
