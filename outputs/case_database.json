@@ -89,6 +89,30 @@
         "last_working_day": "09 03 2026",
         "designation": "jr. developer"
       }
+    },
+    {
+      "case_id": "SC-1005",
+      "phone": "telegram_user",
+      "user_name": "Kudum",
+      "case_type": "Breach of Contract Recovery",
+      "court": "Civil Court",
+      "filing_date": "2026-03-10",
+      "next_deadline": "2026-04-09",
+      "deadline_label": "Evidence Submission",
+      "hearing_date": "2026-04-24",
+      "status": "Filed",
+      "case_data": {
+        "user_name": "Kudum",
+        "phone": "telegram_user",
+        "court": "Civil Court",
+        "city": "Chennai",
+        "opponent_name": "Gama",
+        "opponent_address": "Hm",
+        "contract_date": "Hjs",
+        "contract_subject": "Jakam",
+        "breach_details": "Hukam",
+        "claim_amount": "9000"
+      }
     }
   ]
 }
