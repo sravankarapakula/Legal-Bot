@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.env
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Project Directories & Data
+models/
+outputs/
+data/synthetic_dataset.json
+
+# Temporary scripts and logs
+test_import.py
+test_import2.py
+error.log
+error_transformers.txt
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store

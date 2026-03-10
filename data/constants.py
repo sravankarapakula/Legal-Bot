@@ -22,7 +22,7 @@ DISPUTE_KEYWORDS = {
     "domestic":       ("Domestic Violence",          "Protection Order",        "Family Court"),
     "divorce":        ("Family Dispute",             "Divorce Petition",        "Family Court"),
     "maintenance":    ("Family Dispute",             "Maintenance Claim",       "Family Court"),
-    # ── New Categories ──
+
     "contract":       ("Contract Dispute",           "Breach of Contract",      "Civil Court"),
     "agreement":      ("Contract Dispute",           "Breach of Contract",      "Civil Court"),
     "breach":         ("Contract Dispute",           "Breach of Contract",      "Civil Court"),
@@ -44,7 +44,7 @@ DISPUTE_KEYWORDS = {
     "policy":         ("Insurance Dispute",          "Insurance Claim Recovery","Consumer Forum / IRDAI"),
     "defamation":     ("Defamation Suit",            "Defamation Compensation","Civil Court / Magistrate Court"),
     "slander":        ("Defamation Suit",            "Defamation Compensation","Civil Court / Magistrate Court"),
-    "libel":          ("Defamation Suit",            "Defamation Compensation","Civil Court / Magistrate Court"),
+    "libel":          ("Defamation Suit",            "Def amation Compensation","Civil Court / Magistrate Court"),
     "pil":            ("Public Interest Litigation", "PIL Filing",              "High Court / Supreme Court"),
     "public interest":("Public Interest Litigation", "PIL Filing",              "High Court / Supreme Court"),
     "government":     ("Government Service Dispute", "Service Matter Petition", "Central Administrative Tribunal"),
