@@ -31,73 +31,41 @@ def _next_case_id() -> str:
         conn.close()
 
 
-def create_case(case_data: dict, workflow: dict, court: str,
-                deadline_date: str, deadline_label: str,
-                hearing_date: str) -> str:
-    """Create a new case entry in the MySQL cases table."""
-    case_id = _next_case_id()
-    filing_date = datetime.date.today()
-    phone = case_data.get("phone", "N/A")
-    category = workflow.get("title", "General")
-    pdf_path = case_data.get("pdf_path", "")
+def create_case(case_data: dict, workflow: dict, court: str) -> str:
+    db = load_db()
+    case_id = f"SC-{1000 + len(db['cases']) + 1}"
+    filing_date  = datetime.date.today()
+    deadline     = filing_date + datetime.timedelta(days=30)
+    hearing_date = filing_date + datetime.timedelta(days=45)
 
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO cases (case_id, phone_number, category, court,
-                               filing_date, hearing_date, pdf_path, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'Filed')
-            """,
-            (case_id, phone, category, court,
-             filing_date, hearing_date or None, pdf_path, ),
-        )
-        conn.commit()
-        cur.close()
-    finally:
-        conn.close()
-
+    entry = {
+        "case_id":       case_id,
+        "phone":         case_data.get("phone", "N/A"),
+        "user_name":     case_data.get("user_name", "Unknown"),
+        "case_type":     workflow["title"],
+        "court":         court,
+        "filing_date":   str(filing_date),
+        "next_deadline": str(deadline),
+        "deadline_label":"Evidence Submission",
+        "hearing_date":  str(hearing_date),
+        "status":        "Filed",
+        "case_data":     case_data,
+    }
+    db["cases"].append(entry)
+    save_db(db)
     return case_id
 
 
 def check_reminders():
-    """Return list of (case_dict, days_left) for cases with deadline ≤ 7 days away."""
-    conn = get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT case_id, phone_number, category, court,
-                   filing_date, hearing_date, pdf_path, status
-            FROM cases
-            WHERE hearing_date IS NOT NULL
-              AND DATEDIFF(hearing_date, CURDATE()) <= 7
-              AND hearing_date >= CURDATE()
-            """
-        )
-        rows = cur.fetchall()
-        cur.close()
-
-        reminders = []
-        today = datetime.date.today()
-        for row in rows:
-            case = {
-                "case_id": row[0],
-                "phone": row[1],
-                "category": row[2],
-                "court": row[3],
-                "filing_date": str(row[4]),
-                "hearing_date": str(row[5]),
-                "pdf_path": row[6],
-                "status": row[7],
-                "deadline_label": "Hearing",
-            }
-            days_left = (row[5] - today).days
+    db = load_db()
+    today = datetime.date.today()
+    reminders = []
+    for case in db["cases"]:
+        deadline = datetime.date.fromisoformat(case["next_deadline"])
+        days_left = (deadline - today).days
+        if days_left <= 7:
             reminders.append((case, days_left))
-        return reminders
-    finally:
-        conn.close()
+    return reminders
 
 
 def display_case_tracker(case_id: str):
@@ -125,7 +93,24 @@ def display_case_tracker(case_id: str):
             print(f"  {'Filing Date':<22}: {row[4]}")
             print(f"  {'Hearing Date':<22}: {C.YELLOW}{row[5]}{C.RESET}")
             print()
-        else:
-            print(f"  {C.RED}Case {case_id} not found.{C.RESET}")
-    finally:
-        conn.close()
+            return
+    print(f"  {C.RED}Case {case_id} not found.{C.RESET}")
+
+
+def get_case_tracker_text(case_id: str) -> str:
+    """Return case tracker info as a plain-text string (for Telegram)."""
+    db = load_db()
+    for case in db["cases"]:
+        if case["case_id"] == case_id:
+            return (
+                f"📋 CASE TRACKER — {case_id}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📌 Case ID:       {case['case_id']}\n"
+                f"📂 Case Type:     {case['case_type']}\n"
+                f"🏛 Court:         {case['court']}\n"
+                f"✅ Status:        {case['status']}\n"
+                f"📅 Filing Date:   {case['filing_date']}\n"
+                f"⏰ Next Deadline: {case['next_deadline']}  ({case['deadline_label']})\n"
+                f"📆 Hearing Date:  {case['hearing_date']}"
+            )
+    return f"❌ Case {case_id} not found."
