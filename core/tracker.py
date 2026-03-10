@@ -32,12 +32,13 @@ def save_db(db: dict):
         json.dump(db, f, indent=2)
 
 
-def create_case(case_data: dict, workflow: dict, court: str) -> str:
+def create_case(case_data: dict, workflow: dict, court: str,
+                deadline_date: str, deadline_label: str,
+                hearing_date: str) -> str:
+    """Create a new case entry with user-provided court dates."""
     db = load_db()
     case_id = f"SC-{1000 + len(db['cases']) + 1}"
-    filing_date  = datetime.date.today()
-    deadline     = filing_date + datetime.timedelta(days=30)
-    hearing_date = filing_date + datetime.timedelta(days=45)
+    filing_date = datetime.date.today()
 
     entry = {
         "case_id":       case_id,
@@ -46,9 +47,9 @@ def create_case(case_data: dict, workflow: dict, court: str) -> str:
         "case_type":     workflow["title"],
         "court":         court,
         "filing_date":   str(filing_date),
-        "next_deadline": str(deadline),
-        "deadline_label":"Evidence Submission",
-        "hearing_date":  str(hearing_date),
+        "next_deadline": deadline_date,
+        "deadline_label": deadline_label,
+        "hearing_date":  hearing_date,
         "status":        "Filed",
         "case_data":     case_data,
     }
@@ -57,15 +58,27 @@ def create_case(case_data: dict, workflow: dict, court: str) -> str:
     return case_id
 
 
+def _parse_date(date_str: str) -> datetime.date:
+    """Parse a date string in ISO (YYYY-MM-DD) or DD MMM YYYY format."""
+    try:
+        return datetime.date.fromisoformat(date_str)
+    except ValueError:
+        # Try DD MMM YYYY (e.g. "20 Jun 2026")
+        return datetime.datetime.strptime(date_str, "%d %b %Y").date()
+
+
 def check_reminders():
     db = load_db()
     today = datetime.date.today()
     reminders = []
     for case in db["cases"]:
-        deadline = datetime.date.fromisoformat(case["next_deadline"])
-        days_left = (deadline - today).days
-        if days_left <= 7:
-            reminders.append((case, days_left))
+        try:
+            deadline = _parse_date(case["next_deadline"])
+            days_left = (deadline - today).days
+            if days_left <= 7:
+                reminders.append((case, days_left))
+        except (ValueError, KeyError):
+            pass  # Skip entries with unparseable dates
     return reminders
 
 

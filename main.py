@@ -12,7 +12,7 @@ import datetime
 
 from utils.ui import C, bot, user_input, header, step_banner, info, success, warning, thinking
 from core.classifier import classify_dispute, get_workflow
-from core.document_generator import generate_text_document, txt_to_pdf
+from core.document_generator import generate_pdf_document, generate_text_document
 from core.tracker import OUTPUT_DIR, create_case, check_reminders, display_case_tracker
 
 
@@ -140,41 +140,39 @@ def run_bot():
     thinking("Generating legal petition document")
 
     safe_name = user_name.replace(" ", "_")
-    txt_filename = f"Legal_Petition_{safe_name}.txt"
     pdf_filename = f"Legal_Petition_{safe_name}.pdf"
-    txt_path = os.path.join(OUTPUT_DIR, txt_filename)
     pdf_path = os.path.join(OUTPUT_DIR, pdf_filename)
 
-    # Always generate text first
-    success_gen = generate_text_document(case_data, workflow, txt_path)
+    # Try PDF first; fall back to text only if ReportLab is unavailable
+    txt_gen = False
+    pdf_gen = generate_pdf_document(case_data, workflow, pdf_path)
 
-    # Then convert text to PDF
-    pdf_gen = False
-    if success_gen:
-        success(f"Text document generated: {txt_filename}")
-        thinking("Converting to PDF")
-        pdf_gen = txt_to_pdf(txt_path, pdf_path)
-        if pdf_gen:
-            success(f"PDF generated: {pdf_filename}")
+    if pdf_gen:
+        output_filename = pdf_filename
+        success(f"PDF generated: {pdf_filename}")
+    else:
+        # Fallback to plain text
+        txt_filename = f"Legal_Petition_{safe_name}.txt"
+        txt_path = os.path.join(OUTPUT_DIR, txt_filename)
+        txt_gen = generate_text_document(case_data, workflow, txt_path)
+        output_filename = txt_filename
+        if txt_gen:
+            warning("PDF generation not available — saved as text instead.")
+            success(f"Text document generated: {txt_filename}")
+        else:
+            warning("Document generation failed.")
 
-    output_filename = pdf_filename if pdf_gen else txt_filename
-
-    if success_gen:
-        file_list = f"  Text: {txt_filename}"
-        if pdf_gen:
-            file_list += f"\n  PDF:  {pdf_filename}"
+    if pdf_gen or txt_gen:
         bot(
-            "Your legal petition draft is ready!\n\n"
-            + file_list + "\n\n"
+            f"Your legal petition draft is ready!\n\n"
+            f"  📄 {output_filename}\n\n"
             "Next steps:\n"
             "  1. Download and review the document carefully\n"
             "  2. Fill in any missing details\n"
             "  3. Get it verified by a local advocate if possible\n"
             "  4. Print 3 copies before filing\n\n"
-            "The documents have been saved to your outputs folder."
+            "The document has been saved to your outputs folder."
         )
-    else:
-        warning("Document generation failed.")
 
     # ── STEP 8: Procedural Guidance ───────────────────────────────────────────
     step_banner(8, "Procedural Guidance 🧭")
@@ -206,22 +204,37 @@ def run_bot():
 
     case_id = None
     if track_reply.strip() == "1":
+        bot(
+            "Please enter the court-given dates for tracking.\n"
+            "(Use format: DD MMM YYYY, e.g. 15 Apr 2026)"
+        )
+
+        deadline_date = user_input("Next deadline date (DD MMM YYYY)")
+        if deadline_date.lower() == "quit": return
+
+        deadline_label = user_input("Deadline description (e.g. Evidence Submission, Written Statement)")
+        if deadline_label.lower() == "quit": return
+        if not deadline_label:
+            deadline_label = "Court Deadline"
+
+        hearing_date = user_input("Next hearing date (DD MMM YYYY)")
+        if hearing_date.lower() == "quit": return
+
         thinking("Creating case entry in database")
-        case_id = create_case(case_data, workflow, court)
+        case_id = create_case(case_data, workflow, court,
+                              deadline_date, deadline_label, hearing_date)
         success(f"Case created with ID: {case_id}")
         display_case_tracker(case_id)
 
         # ── STEP 10: Reminders ────────────────────────────────────────────────
         step_banner(10, "Reminder System 🔔")
-        deadline_dt = datetime.date.today() + datetime.timedelta(days=30)
-        hearing_dt  = datetime.date.today() + datetime.timedelta(days=45)
 
         bot(
-            "🔔 AUTOMATIC REMINDERS SCHEDULED\n\n"
-            f"📌 Evidence Submission Deadline: {deadline_dt.strftime('%d %B %Y')}\n"
-            f"   → Reminder: 3 days before ({(deadline_dt - datetime.timedelta(days=3)).strftime('%d %B %Y')})\n\n"
-            f"📌 First Hearing: {hearing_dt.strftime('%d %B %Y')}\n"
-            f"   → Reminder: 2 days before ({(hearing_dt - datetime.timedelta(days=2)).strftime('%d %B %Y')})\n\n"
+            "🔔 REMINDERS SET BASED ON YOUR COURT DATES\n\n"
+            f"📌 {deadline_label}: {deadline_date}\n"
+            f"   → You will be reminded before this date\n\n"
+            f"📌 Next Hearing: {hearing_date}\n"
+            f"   → You will be reminded before this date\n\n"
             "In the WhatsApp version, you would receive automatic\n"
             "reminders directly on your phone."
         )
