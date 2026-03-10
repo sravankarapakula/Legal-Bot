@@ -43,6 +43,30 @@
         "dispute_details": "he had scammed me for an iphone",
         "amount_involved": "75000"
       }
+    },
+    {
+      "case_id": "SC-1003",
+      "phone": "telegram_user",
+      "user_name": "Mohith Kudumu",
+      "case_type": "Rental Deposit / Rent Recovery",
+      "court": "Small Causes Court",
+      "filing_date": "2026-03-10",
+      "next_deadline": "2026-04-09",
+      "deadline_label": "Evidence Submission",
+      "hearing_date": "2026-04-24",
+      "status": "Filed",
+      "case_data": {
+        "user_name": "Mohith Kudumu",
+        "phone": "telegram_user",
+        "court": "Small Causes Court",
+        "city": "Chennai",
+        "landlord_name": "Gaja",
+        "landlord_address": "Kelambakam,chennai",
+        "property_address": "Kalavakam,chennai",
+        "deposit_amount": "100000",
+        "vacated_date": "09 Mar 2026",
+        "rental_start": "09 Mar 2025"
+      }
     }
   ]
 }
