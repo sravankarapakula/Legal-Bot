@@ -206,22 +206,37 @@ def run_bot():
 
     case_id = None
     if track_reply.strip() == "1":
+        bot(
+            "Please enter the court-given dates for tracking.\n"
+            "(Use format: DD MMM YYYY, e.g. 15 Apr 2026)"
+        )
+
+        deadline_date = user_input("Next deadline date (DD MMM YYYY)")
+        if deadline_date.lower() == "quit": return
+
+        deadline_label = user_input("Deadline description (e.g. Evidence Submission, Written Statement)")
+        if deadline_label.lower() == "quit": return
+        if not deadline_label:
+            deadline_label = "Court Deadline"
+
+        hearing_date = user_input("Next hearing date (DD MMM YYYY)")
+        if hearing_date.lower() == "quit": return
+
         thinking("Creating case entry in database")
-        case_id = create_case(case_data, workflow, court)
+        case_id = create_case(case_data, workflow, court,
+                              deadline_date, deadline_label, hearing_date)
         success(f"Case created with ID: {case_id}")
         display_case_tracker(case_id)
 
         # ── STEP 10: Reminders ────────────────────────────────────────────────
         step_banner(10, "Reminder System 🔔")
-        deadline_dt = datetime.date.today() + datetime.timedelta(days=30)
-        hearing_dt  = datetime.date.today() + datetime.timedelta(days=45)
 
         bot(
-            "🔔 AUTOMATIC REMINDERS SCHEDULED\n\n"
-            f"📌 Evidence Submission Deadline: {deadline_dt.strftime('%d %B %Y')}\n"
-            f"   → Reminder: 3 days before ({(deadline_dt - datetime.timedelta(days=3)).strftime('%d %B %Y')})\n\n"
-            f"📌 First Hearing: {hearing_dt.strftime('%d %B %Y')}\n"
-            f"   → Reminder: 2 days before ({(hearing_dt - datetime.timedelta(days=2)).strftime('%d %B %Y')})\n\n"
+            "🔔 REMINDERS SET BASED ON YOUR COURT DATES\n\n"
+            f"📌 {deadline_label}: {deadline_date}\n"
+            f"   → You will be reminded before this date\n\n"
+            f"📌 Next Hearing: {hearing_date}\n"
+            f"   → You will be reminded before this date\n\n"
             "In the WhatsApp version, you would receive automatic\n"
             "reminders directly on your phone."
         )
