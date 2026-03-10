@@ -1,35 +1,34 @@
 """
-Case Tracker — JSON database, case creation, reminders, display.
+Case Tracker — MySQL-backed case creation, reminders, display.
 """
 
 import os
-import json
 import datetime
 
 from utils.ui import C, header
+from database.db import get_connection
 
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
-OUTPUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Legal-Bot", "outputs")
-# Fallback: use the directory of this file's parent
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_THIS_DIR)
 OUTPUT_DIR = os.path.join(_PROJECT_DIR, "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-DB_PATH = os.path.join(OUTPUT_DIR, "case_database.json")
 
+# ─── Case CRUD ────────────────────────────────────────────────────────────────
 
-def load_db() -> dict:
-    if os.path.exists(DB_PATH):
-        with open(DB_PATH) as f:
-            return json.load(f)
-    return {"cases": []}
-
-
-def save_db(db: dict):
-    with open(DB_PATH, "w") as f:
-        json.dump(db, f, indent=2)
+def _next_case_id() -> str:
+    """Generate a sequential case ID like SC-1001, SC-1002, ..."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM cases")
+        count = cur.fetchone()[0]
+        cur.close()
+        return f"SC-{1000 + count + 1}"
+    finally:
+        conn.close()
 
 
 def create_case(case_data: dict, workflow: dict, court: str) -> str:
@@ -70,17 +69,29 @@ def check_reminders():
 
 
 def display_case_tracker(case_id: str):
-    db = load_db()
-    for case in db["cases"]:
-        if case["case_id"] == case_id:
+    """Display case information from the database."""
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT case_id, phone_number, category, court,
+                   filing_date, hearing_date, pdf_path, status
+            FROM cases WHERE case_id = %s
+            """,
+            (case_id,),
+        )
+        row = cur.fetchone()
+        cur.close()
+
+        if row:
             header(f"📋 CASE TRACKER — {case_id}")
-            print(f"  {'Case ID':<22}: {C.BOLD}{case['case_id']}{C.RESET}")
-            print(f"  {'Case Type':<22}: {case['case_type']}")
-            print(f"  {'Court':<22}: {case['court']}")
-            print(f"  {'Status':<22}: {C.GREEN}{case['status']}{C.RESET}")
-            print(f"  {'Filing Date':<22}: {case['filing_date']}")
-            print(f"  {'Next Deadline':<22}: {C.YELLOW}{case['next_deadline']}{C.RESET}  ({case['deadline_label']})")
-            print(f"  {'Hearing Date':<22}: {case['hearing_date']}")
+            print(f"  {'Case ID':<22}: {C.BOLD}{row[0]}{C.RESET}")
+            print(f"  {'Case Type':<22}: {row[2]}")
+            print(f"  {'Court':<22}: {row[3]}")
+            print(f"  {'Status':<22}: {C.GREEN}{row[7]}{C.RESET}")
+            print(f"  {'Filing Date':<22}: {row[4]}")
+            print(f"  {'Hearing Date':<22}: {C.YELLOW}{row[5]}{C.RESET}")
             print()
             return
     print(f"  {C.RED}Case {case_id} not found.{C.RESET}")
