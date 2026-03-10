@@ -58,15 +58,27 @@ def create_case(case_data: dict, workflow: dict, court: str,
     return case_id
 
 
+def _parse_date(date_str: str) -> datetime.date:
+    """Parse a date string in ISO (YYYY-MM-DD) or DD MMM YYYY format."""
+    try:
+        return datetime.date.fromisoformat(date_str)
+    except ValueError:
+        # Try DD MMM YYYY (e.g. "20 Jun 2026")
+        return datetime.datetime.strptime(date_str, "%d %b %Y").date()
+
+
 def check_reminders():
     db = load_db()
     today = datetime.date.today()
     reminders = []
     for case in db["cases"]:
-        deadline = datetime.date.fromisoformat(case["next_deadline"])
-        days_left = (deadline - today).days
-        if days_left <= 7:
-            reminders.append((case, days_left))
+        try:
+            deadline = _parse_date(case["next_deadline"])
+            days_left = (deadline - today).days
+            if days_left <= 7:
+                reminders.append((case, days_left))
+        except (ValueError, KeyError):
+            pass  # Skip entries with unparseable dates
     return reminders
 
 
