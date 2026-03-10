@@ -84,3 +84,22 @@ def display_case_tracker(case_id: str):
             print()
             return
     print(f"  {C.RED}Case {case_id} not found.{C.RESET}")
+
+
+def get_case_tracker_text(case_id: str) -> str:
+    """Return case tracker info as a plain-text string (for Telegram)."""
+    db = load_db()
+    for case in db["cases"]:
+        if case["case_id"] == case_id:
+            return (
+                f"📋 CASE TRACKER — {case_id}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📌 Case ID:       {case['case_id']}\n"
+                f"📂 Case Type:     {case['case_type']}\n"
+                f"🏛 Court:         {case['court']}\n"
+                f"✅ Status:        {case['status']}\n"
+                f"📅 Filing Date:   {case['filing_date']}\n"
+                f"⏰ Next Deadline: {case['next_deadline']}  ({case['deadline_label']})\n"
+                f"📆 Hearing Date:  {case['hearing_date']}"
+            )
+    return f"❌ Case {case_id} not found."
